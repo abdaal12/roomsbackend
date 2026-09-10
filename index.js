@@ -9,7 +9,14 @@ const leadRoutes     = require('./routes/leads');
 
 const app = express();
 
-app.use(cors());
+app.use(cors({
+  origin: [
+    'http://localhost:3000',
+    'https://rooms-amber-xi.vercel.app/',
+    // Add any other domains here
+  ],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
