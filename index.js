@@ -9,18 +9,22 @@ const leadRoutes     = require('./routes/leads');
 
 const app = express();
 
+// CORS — allow your Vercel frontend
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'https://rooms-amber-xi.vercel.app/',
-    // Add any other domains here
+    'https://rooms-amber-xi.vercel.app',
   ],
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// Handle preflight requests
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// NOTE: No more static /uploads — images are on Cloudinary now
 
 app.use('/api/auth',       authRoutes);
 app.use('/api/properties', propertyRoutes);
@@ -28,7 +32,6 @@ app.use('/api/leads',      leadRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
 
-// Connect to MongoDB Atlas
 mongoose
   .connect(process.env.MONGODB_URI)
   .then(() => console.log('✅ MongoDB Atlas connected'))
