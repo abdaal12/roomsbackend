@@ -6,6 +6,8 @@ require('dotenv').config();
 const authRoutes     = require('./routes/auth');
 const propertyRoutes = require('./routes/properties');
 const leadRoutes     = require('./routes/leads');
+const reportRoutes   = require('./routes/reports');
+
 
 const app = express();
 
@@ -29,6 +31,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/auth',       authRoutes);
 app.use('/api/properties', propertyRoutes);
 app.use('/api/leads',      leadRoutes);
+app.use('/api/reports',    reportRoutes);
+
 
 app.get('/api/health', (req, res) => res.json({ status: 'OK' }));
 

@@ -118,4 +118,59 @@ const sendLeadEmail = async (lead, property) => {
   });
 };
 
-module.exports = { sendLeadEmail };
+const sendReportEmail = async (report, property) => {
+  const subject = `🚩 Property Report — ${property.title}`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <div style="background: #c0392b; padding: 24px 28px; border-radius: 8px 8px 0 0;">
+        <h2 style="color: white; margin: 0;">🚩 Property Report Received</h2>
+        <p style="color: rgba(255,255,255,0.8); margin: 6px 0 0; font-size: 14px;">Nivas24 Admin Alert</p>
+      </div>
+      <div style="background: #f9fafb; padding: 28px; border: 1px solid #e5e7eb; border-top: none;">
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px; width: 160px;">Property</td>
+            <td style="padding: 10px 0; color: #111827; font-weight: 600; font-size: 14px;">${property.title}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Location</td>
+            <td style="padding: 10px 0; color: #111827; font-size: 14px;">${property.area}, ${property.city}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Reason</td>
+            <td style="padding: 10px 0; color: #c0392b; font-weight: 700; font-size: 14px;">${report.reason}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Details</td>
+            <td style="padding: 10px 0; color: #111827; font-size: 14px;">${report.details || 'None provided'}</td>
+          </tr>
+          <tr style="border-bottom: 1px solid #e5e7eb;">
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Reported by</td>
+            <td style="padding: 10px 0; color: #111827; font-size: 14px;">${report.reporterName}</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px 0; color: #6b7280; font-size: 14px;">Reporter Phone</td>
+            <td style="padding: 10px 0; color: #111827; font-size: 14px;">${report.reporterPhone || 'Not provided'}</td>
+          </tr>
+        </table>
+        <p style="font-size: 13px; color: #6b7280;">Please review this listing and take action if needed.</p>
+      </div>
+      <div style="background: #f3f4f6; padding: 14px 28px; border-radius: 0 0 8px 8px; border: 1px solid #e5e7eb; border-top: none; text-align: center;">
+        <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+          ${new Date().toLocaleString()} · Nivas24 Admin Panel
+        </p>
+      </div>
+    </div>
+  `;
+
+  await transporter.sendMail({
+    from: `"Nivas24 Reports" <${process.env.EMAIL_USER}>`,
+    to: process.env.ADMIN_EMAIL,
+    subject,
+    html,
+  });
+};
+
+module.exports = { sendLeadEmail, sendReportEmail };
+
