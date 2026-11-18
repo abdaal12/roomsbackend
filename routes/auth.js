@@ -7,24 +7,31 @@ const { protect } = require('../middleware/auth');
 const signToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-// POST /api/auth/register  — create admin account
+// POST /api/auth/register
 router.post('/register', async (req, res) => {
   try {
+    // Signup is closed unless you switch it on in Render env variables
+    if (process.env.ALLOW_ADMIN_SIGNUP !== 'true') {
+      return res.status(403).json({ message: 'Admin registration is closed.' });
+    }
+
     const { name, email, password } = req.body;
 
-    if (!name || !email || !password)
+    if (!name || !email || !password) {
       return res.status(400).json({ message: 'All fields are required.' });
-
-    if (password.length < 6)
+    }
+    if (password.length < 6) {
       return res
         .status(400)
         .json({ message: 'Password must be at least 6 characters.' });
+    }
 
     const existing = await Admin.findOne({ email });
-    if (existing)
+    if (existing) {
       return res
         .status(409)
         .json({ message: 'An admin with this email already exists.' });
+    }
 
     const admin = await Admin.create({ name, email, password });
     const token = signToken(admin._id);
@@ -43,16 +50,16 @@ router.post('/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password)
+    if (!email || !password) {
       return res
         .status(400)
         .json({ message: 'Email and password are required.' });
+    }
 
     const admin = await Admin.findOne({ email }).select('+password');
-    if (!admin || !(await admin.comparePassword(password)))
-      return res
-        .status(401)
-        .json({ message: 'Incorrect email or password.' });
+    if (!admin || !(await admin.comparePassword(password))) {
+      return res.status(401).json({ message: 'Incorrect email or password.' });
+    }
 
     const token = signToken(admin._id);
 
@@ -65,7 +72,7 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GET /api/auth/me  — verify token
+// GET /api/auth/me
 router.get('/me', protect, (req, res) => {
   const { _id, name, email } = req.admin;
   res.json({ _id, name, email });

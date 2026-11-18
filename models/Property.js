@@ -65,6 +65,10 @@ const propertySchema = new mongoose.Schema(
       trim: true,
       default: '',
     },
+    createdBy: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'Admin',
+},
     isAvailable: {
       type: Boolean,
       default: true,

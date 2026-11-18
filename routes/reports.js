@@ -5,7 +5,7 @@ const Property = require('../models/Property');
 const { protect } = require('../middleware/auth');
 const { sendReportEmail } = require('../utils/email');
 
-// POST /api/reports — public, user submits report
+// POST /api/reports — PUBLIC
 router.post('/', async (req, res) => {
   try {
     const { propertyId, reason, details, reporterName, reporterPhone } = req.body;
@@ -20,15 +20,14 @@ router.post('/', async (req, res) => {
     }
 
     const report = await Report.create({
-      property:      propertyId,
+      property: propertyId,
       propertyTitle: property.title,
       reason,
-      details:       details || '',
-      reporterName:  reporterName || 'Anonymous',
+      details: details || '',
+      reporterName: reporterName || 'Anonymous',
       reporterPhone: reporterPhone || '',
     });
 
-    // Email admin
     sendReportEmail(report, property).catch((err) =>
       console.error('Report email failed:', err.message)
     );
@@ -41,27 +40,41 @@ router.post('/', async (req, res) => {
   }
 });
 
-// GET /api/reports — admin only
+// GET /api/reports — ADMIN: only reports on MY properties
 router.get('/', protect, async (req, res) => {
   try {
-    const reports = await Report.find()
+    const myProps = await Property.find({ createdBy: req.admin._id }).select('_id');
+    const reports = await Report.find({
+      property: { $in: myProps.map((p) => p._id) },
+    })
       .populate('property', 'title area city')
       .sort({ createdAt: -1 });
+
     res.json(reports);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// PATCH /api/reports/:id/status — admin only
+// PATCH /api/reports/:id/status — ADMIN: only on MY properties
 router.patch('/:id/status', protect, async (req, res) => {
   try {
-    const report = await Report.findByIdAndUpdate(
-      req.params.id,
-      { status: req.body.status },
-      { new: true }
+    const report = await Report.findById(req.params.id).populate(
+      'property',
+      'createdBy'
     );
-    if (!report) return res.status(404).json({ message: 'Report not found.' });
+
+    if (
+      !report ||
+      !report.property ||
+      String(report.property.createdBy) !== String(req.admin._id)
+    ) {
+      return res.status(404).json({ message: 'Report not found.' });
+    }
+
+    report.status = req.body.status;
+    await report.save();
+
     res.json(report);
   } catch (err) {
     res.status(400).json({ message: err.message });

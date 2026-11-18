@@ -6,7 +6,7 @@ const { upload, deleteFromCloudinary } = require('../utils/cloudinary');
 
 // ── PUBLIC ────────────────────────────────────────────────────────────────────
 
-// GET /api/properties — public listing with search & filter
+// GET /api/properties — all available properties (homepage)
 router.get('/', async (req, res) => {
   try {
     const { search, roomType, maxPrice, page = 1, limit = 12 } = req.query;
@@ -17,7 +17,7 @@ router.get('/', async (req, res) => {
       query.$or = [{ area: re }, { address: re }, { title: re }, { city: re }];
     }
     if (roomType) query.roomType = roomType;
-    if (maxPrice)  query.priceMin = { $lte: Number(maxPrice) };
+    if (maxPrice) query.priceMin = { $lte: Number(maxPrice) };
 
     const skip = (Number(page) - 1) * Number(limit);
     const [properties, total] = await Promise.all([
@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
     res.json({
       properties,
       total,
-      page:       Number(page),
+      page: Number(page),
       totalPages: Math.ceil(total / Number(limit)),
     });
   } catch (err) {
@@ -36,17 +36,24 @@ router.get('/', async (req, res) => {
   }
 });
 
-// GET /api/properties/all — admin gets ALL including unavailable
+// ── ADMIN: own properties only ────────────────────────────────────────────────
+// NOTE: must stay ABOVE '/:id' or "all" will be treated as an id
+
+// GET /api/properties/all
 router.get('/all', protect, async (req, res) => {
   try {
-    const properties = await Property.find().sort({ createdAt: -1 });
+    const properties = await Property.find({ createdBy: req.admin._id }).sort({
+      createdAt: -1,
+    });
     res.json({ properties, total: properties.length });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// GET /api/properties/:id — single property
+// ── PUBLIC: single property ───────────────────────────────────────────────────
+
+// GET /api/properties/:id
 router.get('/:id', async (req, res) => {
   try {
     const property = await Property.findById(req.params.id);
@@ -57,12 +64,11 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ── ADMIN ONLY ────────────────────────────────────────────────────────────────
+// ── ADMIN: write operations ───────────────────────────────────────────────────
 
-// POST /api/properties — add new property
+// POST /api/properties — add property
 router.post('/', protect, upload.array('images', 6), async (req, res) => {
   try {
-    // Cloudinary returns secure_url for each uploaded file
     const images = req.files ? req.files.map((f) => f.path) : [];
 
     const amenities = req.body.amenities
@@ -73,10 +79,11 @@ router.post('/', protect, upload.array('images', 6), async (req, res) => {
 
     const property = await Property.create({
       ...req.body,
-      priceMin:  Number(req.body.priceMin),
-      priceMax:  Number(req.body.priceMax),
+      priceMin: Number(req.body.priceMin),
+      priceMax: Number(req.body.priceMax),
       images,
       amenities,
+      createdBy: req.admin._id, // last, so the client can never override it
     });
 
     res.status(201).json(property);
@@ -85,16 +92,17 @@ router.post('/', protect, upload.array('images', 6), async (req, res) => {
   }
 });
 
-// PUT /api/properties/:id — edit property
+// PUT /api/properties/:id — edit (own property only)
 router.put('/:id', protect, upload.array('images', 6), async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id);
+    const property = await Property.findOne({
+      _id: req.params.id,
+      createdBy: req.admin._id,
+    });
     if (!property) return res.status(404).json({ message: 'Property not found' });
 
-    // New images uploaded to Cloudinary this edit
     const newImages = req.files ? req.files.map((f) => f.path) : [];
 
-    // Existing images the admin chose to keep (sent from frontend)
     let keptImages = [];
     if (req.body.existingImages) {
       keptImages = Array.isArray(req.body.existingImages)
@@ -102,15 +110,10 @@ router.put('/:id', protect, upload.array('images', 6), async (req, res) => {
         : [req.body.existingImages];
     }
 
-    // Find images that were removed (in DB but not in keptImages)
-    const removedImages = property.images.filter(
-      (img) => !keptImages.includes(img)
-    );
-
     // Delete removed images from Cloudinary
+    const removedImages = property.images.filter((img) => !keptImages.includes(img));
     await Promise.all(removedImages.map((url) => deleteFromCloudinary(url)));
 
-    // Final images list
     const images = [...keptImages, ...newImages];
 
     const amenities = req.body.amenities
@@ -122,18 +125,18 @@ router.put('/:id', protect, upload.array('images', 6), async (req, res) => {
     const updated = await Property.findByIdAndUpdate(
       req.params.id,
       {
-        title:          req.body.title,
-        description:    req.body.description,
-        address:        req.body.address,
-        area:           req.body.area,
-        city:           req.body.city,
-        locationUrl:    req.body.locationUrl,
-        priceMin:       Number(req.body.priceMin),
-        priceMax:       Number(req.body.priceMax),
-        roomType:       req.body.roomType,
-        ownerName:      req.body.ownerName,
-        ownerPhone:     req.body.ownerPhone,
-        ownerWhatsapp:  req.body.ownerWhatsapp,
+        title: req.body.title,
+        description: req.body.description,
+        address: req.body.address,
+        area: req.body.area,
+        city: req.body.city,
+        locationUrl: req.body.locationUrl,
+        priceMin: Number(req.body.priceMin),
+        priceMax: Number(req.body.priceMax),
+        roomType: req.body.roomType,
+        ownerName: req.body.ownerName,
+        ownerPhone: req.body.ownerPhone,
+        ownerWhatsapp: req.body.ownerWhatsapp,
         amenities,
         images,
       },
@@ -146,17 +149,20 @@ router.put('/:id', protect, upload.array('images', 6), async (req, res) => {
   }
 });
 
-// PATCH /api/properties/:id/availability — toggle available/unavailable
+// PATCH /api/properties/:id/availability — toggle (own property only)
 router.patch('/:id/availability', protect, async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id);
+    const property = await Property.findOne({
+      _id: req.params.id,
+      createdBy: req.admin._id,
+    });
     if (!property) return res.status(404).json({ message: 'Property not found' });
 
     property.isAvailable = !property.isAvailable;
     await property.save();
 
     res.json({
-      message:     `Property marked as ${property.isAvailable ? 'available' : 'unavailable'}`,
+      message: `Property marked as ${property.isAvailable ? 'available' : 'unavailable'}`,
       isAvailable: property.isAvailable,
       property,
     });
@@ -165,15 +171,16 @@ router.patch('/:id/availability', protect, async (req, res) => {
   }
 });
 
-// DELETE /api/properties/:id — delete property + remove images from Cloudinary
+// DELETE /api/properties/:id — own property only
 router.delete('/:id', protect, async (req, res) => {
   try {
-    const property = await Property.findById(req.params.id);
+    const property = await Property.findOne({
+      _id: req.params.id,
+      createdBy: req.admin._id,
+    });
     if (!property) return res.status(404).json({ message: 'Property not found' });
 
-    // Delete all images from Cloudinary
     await Promise.all(property.images.map((url) => deleteFromCloudinary(url)));
-
     await Property.findByIdAndDelete(req.params.id);
 
     res.json({ message: 'Property deleted successfully' });
