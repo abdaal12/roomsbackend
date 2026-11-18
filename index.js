@@ -14,6 +14,7 @@ const app = express();
 // CORS — allow your Vercel frontend
 app.use(cors({
   origin: [
+    'https://www.nivas24.online',
     'http://localhost:3000',
     'https://rooms-amber-xi.vercel.app',
   ],
